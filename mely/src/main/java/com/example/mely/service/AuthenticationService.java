@@ -26,31 +26,31 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
+        private final UserRepository userRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final JwtService jwtService;
+        private final AuthenticationManager authenticationManager;
 
-    public JwtResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()));
+        public JwtResponse login(LoginRequest request) {
+                Authentication authentication = authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(
+                                                request.getEmail(),
+                                                request.getPassword()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow();
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+                User user = userRepository.findByEmail(request.getEmail())
+                                .orElseThrow();
 
-        String jwtToken = jwtService.generateToken(userDetails);
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+                String jwtToken = jwtService.generateToken(userDetails);
+                String refreshToken = jwtService.generateToken(userDetails);
 
-        return JwtResponse.builder()
-                .accessToken(jwtToken)
-                .refreshToken(refreshToken)
-                .userId(user.getId())
-                .email(user.getEmail())
-                .role(user.getRoleType().name())
-                .build();
-    }
+                return JwtResponse.builder()
+                                .accessToken(jwtToken)
+                                .refreshToken(refreshToken)
+                                .userId(user.getId())
+                                .email(user.getEmail())
+                                .role(user.getRoleType().name())
+                                .build();
+        }
 }

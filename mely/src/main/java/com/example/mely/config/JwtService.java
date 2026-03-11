@@ -1,6 +1,5 @@
 package com.example.mely.config;
 
-package com.example.mely.config;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
