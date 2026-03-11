@@ -9,13 +9,13 @@ import java.util.UUID;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class JwtResponse {
-    private String token;
-    private String type = "Bearer";
+    private String accessToken;
+    private String refreshToken;
+    private String tokenType = "Bearer";
     private UUID userId;
     private String email;
-    private String firstName;
-    private String lastName;
+    private String role;
 }
