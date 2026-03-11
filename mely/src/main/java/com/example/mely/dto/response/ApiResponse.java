@@ -1,4 +1,4 @@
-package com.example.mely.dto.request.response;
+package com.example.mely.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
