@@ -1,200 +1,102 @@
 package com.example.mely.service;
 
-import com.example.mely.dto.request.*;
-import com.example.mely.dto.response.RegistrationResponse;
-import com.example.mely.model.*;
-import com.example.mely.model.Enums.*;
-import com.example.mely.repository.*;
+import com.example.mely.dto.request.RegistrationRequestDTO;
+import com.example.mely.dto.request.VerificationRequestDTO;
+import com.example.mely.model.Enums.KycStatus;
+import com.example.mely.model.Enums.RoleType;
+import com.example.mely.model.Enums.VerificationStatus;
+import com.example.mely.model.User;
+import com.example.mely.model.UserVerification;
+import com.example.mely.repository.UserRepository;
+import com.example.mely.repository.UserVerificationRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class RegistrationService {
-
+    private final UserVerificationRepository userVerificationRepository;
     private final UserRepository userRepository;
-    private final UserVerificationRepository verificationRepository;
-    private final AccountRepository accountRepository;
+    private final OtpService otpService;
+    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
 
-    // Temporary storage for registration sessions (in production, use Redis)
-    private final Map<String, RegistrationSession> registrationSessions = new HashMap<>();
+    /**
+     * Phase 1: Create/update staging record and trigger email otp sending.
+     * Called when the user submits the first registration form.
+     */
 
     @Transactional
-    public RegistrationResponse step1AccountSetup(AccountSetupRequest request) {
-        // Validate passwords match
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new RuntimeException("Passwords do not match");
+    public void startRegistration(RegistrationRequestDTO dto) {
+        // 1. Safety check: if the email already in the main user table
+        if (userRepository.existsByEmail(dto.getEmail())){
+            throw new RuntimeException("Email is already registered.");
         }
 
-        // Check if email already exists
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
-        }
+        //2. Generate a secure 6 digit otp
+        String otp = otpService.generateOtp(dto.getEmail());
 
-        // Create registration session
-        String sessionId = UUID.randomUUID().toString();
-        RegistrationSession session = RegistrationSession.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .currentStep(1)
-                .build();
+        /**
+         * Handling the user verification step.
+         * Create or update, depending on the user action
+         */
+        UserVerification verification = userVerificationRepository.findByEmail(dto.getEmail()).orElse(new UserVerification());
 
-        registrationSessions.put(sessionId, session);
+        verification.setFirstName(dto.getFirstName());
+        verification.setLastName(dto.getLastName());
+        verification.setEmail(dto.getEmail());
+        verification.setPhone(dto.getPhone());
+        verification.setOtpCode(otp);
+        verification.setOtpExpiresAt(LocalDateTime.now().plusMinutes(10));
+        verification.setVerificationStatus(VerificationStatus.PENDING);
 
-        return RegistrationResponse.builder()
-                .message("Account setup completed")
-                .email(request.getEmail())
-                .sessionId(sessionId)
-                .currentStep(1)
-                .completed(false)
-                .build();
+        userVerificationRepository.save(verification);
+
+        //Send the email with the generated otp
+        emailService.sendOtpEmail(dto.getEmail(), otp);
     }
 
-    @Transactional
-    public RegistrationResponse step2Kyc(KycRequest request) {
-        RegistrationSession session = registrationSessions.get(request.getSessionId());
-        if (session == null) {
-            throw new RuntimeException("Invalid session");
-        }
-
-        session.setFirstName(request.getFirstName());
-        session.setLastName(request.getLastName());
-        session.setNationalIdNumber(request.getNationalIdNumber());
-        session.setDateOfBirth(request.getDateOfBirth());
-        session.setCurrentStep(2);
-
-        registrationSessions.put(request.getSessionId(), session);
-
-        return RegistrationResponse.builder()
-                .message("KYC information completed")
-                .email(session.getEmail())
-                .sessionId(request.getSessionId())
-                .currentStep(2)
-                .completed(false)
-                .build();
-    }
+    /**
+     * Phase 2: Verify code via OtpService and migrate to permanent User table.
+     */
 
     @Transactional
-    public RegistrationResponse step3ContactPreferences(ContactPreferencesRequest request) {
-        RegistrationSession session = registrationSessions.get(request.getSessionId());
-        if (session == null) {
-            throw new RuntimeException("Invalid session");
+    public User verifyAndCreateUser(VerificationRequestDTO dto) {
+        UserVerification verification = userVerificationRepository.findByEmail(dto.getEmail()).orElseThrow(
+                () -> new RuntimeException("Registration process not found.")
+        );
+
+        //Use otpService to validate the incoming code
+        boolean isOtpValid = otpService.validateOtp(dto.getEmail(), dto.getOtp());
+
+        if(!isOtpValid){
+            throw new RuntimeException("Invalid code.");
+        }
+        if(verification.getOtpExpiresAt().isBefore(LocalDateTime.now())){
+            throw new RuntimeException("Code expired.");
         }
 
-        session.setPhoneNumber(request.getPhoneNumber());
-        session.setHomeAddress(request.getHomeAddress());
-        session.setZakatHandling(request.getZakatHandling() != null ? request.getZakatHandling() : false);
-        session.setCurrentStep(3);
-
-        registrationSessions.put(request.getSessionId(), session);
-
-        return RegistrationResponse.builder()
-                .message("Contact and preferences completed")
-                .email(session.getEmail())
-                .sessionId(request.getSessionId())
-                .currentStep(3)
-                .completed(false)
-                .build();
-    }
-
-    @Transactional
-    public RegistrationResponse completeRegistration(String sessionId) {
-        RegistrationSession session = registrationSessions.get(sessionId);
-        if (session == null) {
-            throw new RuntimeException("Invalid session");
-        }
-
-        // Create User
+        // Build and save the final User
         User user = User.builder()
-                .tenantId(UUID.randomUUID()) // In production, this would come from the tenant context
-                .firstName(session.getFirstName())
-                .lastName(session.getLastName())
-                .email(session.getEmail())
-                .password(session.getPassword())
+                .tenantId(verification.getTenantId())
+                .firstName(verification.getFirstName())
+                .lastName(verification.getLastName())
+                .email(verification.getEmail())
+                .password(passwordEncoder.encode(dto.getPassword()))
                 .roleType(RoleType.USER)
-                .kycStatus(KycStatus.COMPLETED)
-                .zakatHandling(session.getZakatHandling())
-                .createdAt(LocalDate.now().atStartOfDay())
+                .kycStatus(KycStatus.PENDING)
+                .verificationId(verification.getId())
                 .build();
 
-        user = userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
-        // Create Verification record
-        UserVerification verification = UserVerification.builder()
-                .tenantId(user.getTenantId())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .email(user.getEmail())
-                .phone(session.getPhoneNumber())
-                .verificationStatus(VerificationStatus.PENDING)
-                .build();
-
-        verification = verificationRepository.save(verification);
-
-        // Update user with verification ID
-        user.setVerificationId(verification.getId());
-        userRepository.save(user);
-
-        // Create Account
-        Account account = Account.builder()
-                .tenantId(user.getTenantId())
-                .userId(user.getId())
-                .accountNumber(generateAccountNumber())
-                .contractType(ContractType.SAVINGS)
-                .currencyCode("SAR")
-                .balance(BigDecimal.ZERO)
-                .profitShareRatio(new BigDecimal("0.00"))
-                .status(AccountStatus.ACTIVE)
-                .openingDate(LocalDate.now())
-                .build();
-
-        accountRepository.save(account);
-
-        // Clear session
-        registrationSessions.remove(sessionId);
-
-        return RegistrationResponse.builder()
-                .message("Registration completed successfully")
-                .userId(user.getId())
-                .email(user.getEmail())
-                .currentStep(3)
-                .completed(true)
-                .build();
-    }
-
-    private String generateAccountNumber() {
-        // Generate a unique account number
-        String accountNumber;
-        do {
-            accountNumber = String.format("%016d",
-                    (long) (Math.random() * 10000000000000000L));
-        } while (accountRepository.existsByAccountNumber(accountNumber));
-
-        return accountNumber;
-    }
-
-    // Inner class for registration session
-    @lombok.Data
-    @lombok.Builder
-    private static class RegistrationSession {
-        private String email;
-        private String password;
-        private String firstName;
-        private String lastName;
-        private String nationalIdNumber;
-        private LocalDate dateOfBirth;
-        private String phoneNumber;
-        private String homeAddress;
-        private Boolean zakatHandling;
-        private int currentStep;
+        //update verification record to APPROVED
+        verification.setVerificationStatus(VerificationStatus.APPROVED);
+        userVerificationRepository.save(verification);
+        return savedUser;
     }
 }

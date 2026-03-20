@@ -1,0 +1,22 @@
+### Phase 1: Start Registration
+POST http://{{host}}:{{port}}/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Mohamed Aziz",
+  "lastName": "Hafhouf",
+  "email": "mohamedazizhafhouf7@gmail.com",
+  "phone": "+21612345678"
+}
+
+> {% client.global.set("auth_email", response.body.email); %}
+
+### Phase 2: Verify OTP and Set Password
+POST http://{{host}}:{{port}}/api/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "mohamedazizhafhouf7@gmail.com",
+  "otp": "129470",
+  "password": "SecurePassword123!"
+}
