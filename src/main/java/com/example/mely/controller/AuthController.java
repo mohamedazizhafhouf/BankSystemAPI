@@ -3,6 +3,8 @@ package com.example.mely.controller;
 
 import com.example.mely.dto.request.RegistrationRequestDTO;
 import com.example.mely.dto.request.VerificationRequestDTO;
+import com.example.mely.dto.response.AuthResponse;
+import com.example.mely.dto.response.UserResponse;
 import com.example.mely.model.User;
 import com.example.mely.service.RegistrationService;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +25,14 @@ public class AuthController {
      * Step 1: Collect info, generate OTP, send email.
      */
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegistrationRequestDTO request) {
+    public ResponseEntity<AuthResponse> register(@RequestBody RegistrationRequestDTO request) {
         registrationService.startRegistration(request);
-        return ResponseEntity.ok("OTP sent successfully to " + request.getEmail());
+        AuthResponse response = new AuthResponse().builder()
+                .message("OTP sent successfully to " + request.getEmail())
+                .success(true)
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -33,9 +40,16 @@ public class AuthController {
      * Step 2: Validate OTP and Password, then create the official User.
      */
     @PostMapping("/verify-otp")
-    public ResponseEntity<User> verifyOtp(@RequestBody VerificationRequestDTO request) {
+    public ResponseEntity<UserResponse> verifyOtp(@RequestBody VerificationRequestDTO request) {
         User createdUser = registrationService.verifyAndCreateUser(request);
-        return ResponseEntity.ok(createdUser);
+        UserResponse response = new UserResponse(
+                createdUser.getId(),
+                createdUser.getFirstName(),
+                createdUser.getLastName(),
+                createdUser.getEmail(),
+                createdUser.getKycStatus(),
+                createdUser.getZakatHandling());
+        return ResponseEntity.ok(response);
     }
 }
 
