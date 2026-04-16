@@ -36,7 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         // 4. Permit your Auth endpoints
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/system/provision","/api/v1/system/provision/**").permitAll()
                         .anyRequest().authenticated()
 
