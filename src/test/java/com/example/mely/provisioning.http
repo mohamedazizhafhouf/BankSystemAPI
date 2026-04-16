@@ -1,0 +1,37 @@
+### Variables Setup (Optional: You can use http-client.env.json)
+### 1. Provision a New Bank Workspace
+# This simulates the Super-Admin creating a new tenant (e.g., Zitouna Bank)
+POST http://{{host}}:{{port}}/api/v1/system/provision
+Content-Type: application/json
+X-Mely-System-Key: {{systemKey}}
+
+{
+  "firstName": "Mohamed",
+  "lastName": "Hafhouf",
+  "bankName": "Zitouna Bank",
+  "adminEmail": "admin@zitouna.tn",
+  "tempPassword": "Password123!"
+}
+
+> {%
+    client.test("Request executed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+### 2. Login as the New Bank Admin
+# After provisioning, test if the new admin can actually get a JWT
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@zitouna.tn",
+  "password": "Password123!"
+}
+
+### 3. Test a Protected Endpoint (Multi-tenant check)
+# Once you have the token from the login above, paste it here
+@authToken = YOUR_JWT_HERE
+
+GET {{host}}/api/v1/bank/dashboard
+Authorization: Bearer {{authToken}}

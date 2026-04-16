@@ -24,10 +24,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Explicitly enable CORS using your bean
+                // 1 - Explicitly enable CORS using your bean
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 2. Disable CSRF for the registration/auth endpoints
+                // 2 - Disable CSRF for the registration/auth endpoints
                 // (Since we are using stateless JWT/OTP flow)
                 .csrf(csrf -> csrf.disable())
 
@@ -37,7 +37,9 @@ public class SecurityConfig {
 
                         // 4. Permit your Auth endpoints
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/v1/system/provision","/api/v1/system/provision/**").permitAll()
                         .anyRequest().authenticated()
+
                 );
 
         return http.build();
@@ -49,7 +51,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:4200"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Here we add custom headers
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Organization-Id", "X-Mely-System-Key"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

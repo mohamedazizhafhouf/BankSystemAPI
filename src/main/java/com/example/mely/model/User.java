@@ -41,19 +41,8 @@ public class User {
     @Enumerated(EnumType.STRING)
     private RoleType roleType;
 
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "kyc_status", nullable = false,
-            columnDefinition = "VARCHAR(20) DEFAULT 'PENDING' CHECK (kyc_status IN ('PENDING', 'VERIFIED', 'REJECTED'))")
-    private KycStatus kycStatus = KycStatus.PENDING;
-
-    private Boolean zakatHandling;
-
     @CreationTimestamp
     private LocalDateTime createdAt;
-
-    @Column(name = "verification_id")
-    private UUID verificationId;
 
     private String lastLoginIp;
 }
