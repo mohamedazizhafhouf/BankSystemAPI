@@ -41,16 +41,8 @@ public class User {
     @Enumerated(EnumType.STRING)
     private RoleType roleType;
 
-    @Enumerated(EnumType.STRING)
-    private KycStatus kycStatus;
-
-    private Boolean zakatHandling;
-
     @CreationTimestamp
     private LocalDateTime createdAt;
-
-    @Column(name = "verification_id")
-    private UUID verificationId;
 
     private String lastLoginIp;
 }

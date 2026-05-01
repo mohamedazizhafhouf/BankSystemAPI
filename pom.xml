@@ -97,8 +97,20 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-      
 
+        <!-- Starter Mail -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Argon2 Implementation -->
+
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
 
 	</dependencies>
 

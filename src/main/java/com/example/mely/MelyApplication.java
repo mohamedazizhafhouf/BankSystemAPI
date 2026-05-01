@@ -8,6 +8,7 @@ public class MelyApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(MelyApplication.class, args);
+		System.out.println("MelyApplication started");
 	}
 
 }

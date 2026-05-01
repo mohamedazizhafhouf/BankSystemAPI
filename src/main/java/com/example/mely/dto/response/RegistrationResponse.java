@@ -15,7 +15,4 @@ public class RegistrationResponse {
     private String message;
     private UUID userId;
     private String email;
-    private String sessionId;
-    private Integer currentStep;
-    private Boolean completed;
-}
+    private String sessionId;}
