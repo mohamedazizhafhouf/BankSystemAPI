@@ -1,15 +1,24 @@
 package com.example.mely.model;
 
-import com.example.mely.model.Enums.*;
-import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.example.mely.model.Enums.RoleType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 @Builder
@@ -45,4 +54,27 @@ public class User {
     private LocalDateTime createdAt;
 
     private String lastLoginIp;
+
+
+    @Column(name = "zakat_handling")
+    private Boolean zakatHandling;
+    
+    
+    
+    @Column(name = "verification_id")
+    private UUID verificationId;
+    
+    
+    
+    @Column(name = "phone_number")
+    private String phoneNumber;
+    
+    @Column(name = "home_address")
+    private String homeAddress;
+    
+    @Column(name = "national_id_number")
+    private String nationalIdNumber;
+    
+    @Column(name = "date_of_birth")
+    private LocalDateTime dateOfBirth;    
 }
