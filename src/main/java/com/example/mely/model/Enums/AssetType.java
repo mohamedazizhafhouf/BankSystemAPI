@@ -1,0 +1,18 @@
+package com.example.mely.model.Enums;
+public enum  AssetType {
+
+     CASH,
+    GOLD,
+    SILVER,
+    BUSINESS_INVENTORY,
+    INVESTMENT_STOCKS,
+    INVESTMENT_REAL_ESTATE,
+    INVESTMENT_MUTUAL_FUNDS,
+    SAVINGS_ACCOUNT,
+    CURRENT_ACCOUNT,
+    EXCHANGE_TRADED_FUNDS,
+    CRYPTO_CURRENCY,
+    RETIREMENT_FUNDS,
+    OTHER_ASSETS
+    
+}
