@@ -1,18 +1,15 @@
 package com.example.mely.controller;
 
+import com.example.mely.dto.request.RegisterRequest;
 import com.example.mely.dto.request.LoginRequest;
 import com.example.mely.dto.response.ErrorResponse;
 import com.example.mely.dto.response.LoginResponse;
+import com.example.mely.dto.response.RegistrationResponse;
 import com.example.mely.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.DisabledException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,20 +22,24 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            String token = authService.authenticateUser(
+            RegistrationResponse response = authService.registerSaasUser(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = authService.authenticateUser(
                     request.getEmail(),
                     request.getPassword()
             );
-
-            LoginResponse response = LoginResponse.builder()
-                    .token(token)
-                    .tokenType("Bearer")
-                    .email(request.getEmail())
-                    .message("Login successful")
-                    .build();
 
             return ResponseEntity.ok(response);
 
