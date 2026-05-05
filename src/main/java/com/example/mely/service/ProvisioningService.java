@@ -23,7 +23,7 @@ public class ProvisioningService {
     @Autowired private MembershipRepository membershipRepo;
     @Autowired private PasswordEncoder passwordEncoder;
 
-    public void provisionNewBank(String bankName, String adminEmail, String tempPassword, String firstName, String lastName) {
+    public void provisionNewBank(String firstName, String lastName, String bankName, String adminEmail, String tempPassword) {
         // 1 - Create the Organization (The Tenant)
         Organization org = new Organization();
         org.setName(bankName);
