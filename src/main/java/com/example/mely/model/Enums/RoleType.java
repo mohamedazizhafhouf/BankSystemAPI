@@ -4,5 +4,6 @@ public enum RoleType {
     SAAS_USER,
     ADMIN,
     LOAN_OFFICER,
-    SHARIA_AUDITOR
+    SHARIA_AUDITOR,
+    EMPLOYEE
 }

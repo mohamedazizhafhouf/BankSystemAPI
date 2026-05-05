@@ -2,11 +2,11 @@ package com.example.mely.controller;
 
 import com.example.mely.dto.request.RegisterRequest;
 import com.example.mely.dto.request.LoginRequest;
+import com.example.mely.dto.request.CreateEmployeeRequest;
 import com.example.mely.dto.response.ErrorResponse;
 import com.example.mely.dto.response.LoginResponse;
 import com.example.mely.dto.response.RegistrationResponse;
 import com.example.mely.service.AuthService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
