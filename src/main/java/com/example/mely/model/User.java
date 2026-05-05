@@ -77,4 +77,30 @@ public class User {
     
     @Column(name = "date_of_birth")
     private LocalDateTime dateOfBirth;    
+
+    public void updateZakatHandling(Boolean enabled, com.example.mely.service.ZakatService zakatService) {
+        this.zakatHandling = enabled;
+        // If enabling, initialize hawl tracking
+        if (enabled && zakatService != null && this.id != null) {
+            zakatService.initializeHawlTracking(this.id);
+        }
+    }
+
+     public void updateZakatHandling(Boolean enabled) {
+        this.zakatHandling = enabled;
+    }
+
+    public boolean isZakatEnabled() {
+        return Boolean.TRUE.equals(this.zakatHandling);
+    }
+
+     public String getFullName() {
+        return this.firstName + " " + this.lastName;
+    }
+
+
+    public void updateLastLoginIp(String ipAddress) {
+        this.lastLoginIp = ipAddress;
+    }
+        
 }
