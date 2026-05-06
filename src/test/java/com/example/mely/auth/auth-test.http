@@ -1,22 +1,19 @@
-### Phase 1: Start Registration
-POST http://{{host}}:{{port}}/api/auth/register
+### 1. Register a normal Mely SaaS user
+POST http://{{host}}:{{port}}/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Mohamed Aziz",
-  "lastName": "Hafhouf",
-  "email": "mohamedazizhafhouf7@gmail.com",
-  "phone": "+21612345678"
+  "firstName": "Mely",
+  "lastName": "User",
+  "email": "saas.user@mely.app",
+  "password": "Password123!"
 }
 
-> {% client.global.set("auth_email", response.body.email); %}
-
-### Phase 2: Verify OTP and Set Password
-POST http://{{host}}:{{port}}/api/auth/verify-otp
+### 2. Login as the SaaS user
+POST http://{{host}}:{{port}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "mohamedazizhafhouf7@gmail.com",
-  "otp": "129470",
-  "password": "SecurePassword123!"
+  "email": "saas.user@mely.app",
+  "password": "Password123!"
 }

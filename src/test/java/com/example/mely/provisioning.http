@@ -21,7 +21,7 @@ X-Mely-System-Key: {{systemKey}}
 
 ### 2. Login as the New Bank Admin
 # After provisioning, test if the new admin can actually get a JWT
-POST {{host}}/api/auth/login
+POST http://{{host}}:{{port}}/api/v1/auth/login
 Content-Type: application/json
 
 {
@@ -29,9 +29,30 @@ Content-Type: application/json
   "password": "Password123!"
 }
 
-### 3. Test a Protected Endpoint (Multi-tenant check)
-# Once you have the token from the login above, paste it here
+### 3. Create a new employee as bank admin
 @authToken = YOUR_JWT_HERE
 
-GET {{host}}/api/v1/bank/dashboard
+POST http://{{host}}:{{port}}/api/v1/bank/employees
 Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Loan",
+  "lastName": "Officer",
+  "email": "loan.officer@zitouna.tn",
+  "password": "Password123!",
+  "role": "LOAN_OFFICER"
+}
+
+### 4. List organization employees
+GET http://{{host}}:{{port}}/api/v1/bank/employees
+Authorization: Bearer {{authToken}}
+
+### 5. Login as the created employee
+POST http://{{host}}:{{port}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "loan.officer@zitouna.tn",
+  "password": "Password123!"
+}

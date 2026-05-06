@@ -1,0 +1,200 @@
+### Halal stocks API
+### Set authToken first, or login from your existing auth flow.
+
+@host = localhost
+@port = 8090
+@authToken = YOUR_JWT_HERE
+@samplePdfPath = C:/temp/company-financials.pdf
+
+### 1. Sync screening with manual numbers only
+POST http://{{host}}:{{port}}/api/v1/stocks/check
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=SyncBoundary
+
+--SyncBoundary
+Content-Disposition: form-data; name="mode"
+
+SYNC
+--SyncBoundary
+Content-Disposition: form-data; name="companyName"
+
+Sukuk Tech
+--SyncBoundary
+Content-Disposition: form-data; name="ticker"
+
+SKTK
+--SyncBoundary
+Content-Disposition: form-data; name="countryOrMarket"
+
+Tunisia
+--SyncBoundary
+Content-Disposition: form-data; name="currency"
+
+TND
+--SyncBoundary
+Content-Disposition: form-data; name="businessDescription"
+
+Core software infrastructure for financial institutions
+--SyncBoundary
+Content-Disposition: form-data; name="sector"
+
+Technology
+--SyncBoundary
+Content-Disposition: form-data; name="interestBearingDebt"
+
+20
+--SyncBoundary
+Content-Disposition: form-data; name="cashAndInterestBearingAssets"
+
+10
+--SyncBoundary
+Content-Disposition: form-data; name="totalAssetsOrMarketCap"
+
+100
+--SyncBoundary
+Content-Disposition: form-data; name="totalRevenue"
+
+100
+--SyncBoundary
+Content-Disposition: form-data; name="nonCompliantIncome"
+
+2
+--SyncBoundary
+Content-Disposition: form-data; name="investedAmount"
+
+1000
+--SyncBoundary--
+
+### 2. Async screening with PDF upload
+POST http://{{host}}:{{port}}/api/v1/stocks/check
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=AsyncBoundary
+
+--AsyncBoundary
+Content-Disposition: form-data; name="mode"
+
+ASYNC
+--AsyncBoundary
+Content-Disposition: form-data; name="companyName"
+
+Async Capital
+--AsyncBoundary
+Content-Disposition: form-data; name="countryOrMarket"
+
+Tunisia
+--AsyncBoundary
+Content-Disposition: form-data; name="currency"
+
+TND
+--AsyncBoundary
+Content-Disposition: form-data; name="businessDescription"
+
+Digital payments software
+--AsyncBoundary
+Content-Disposition: form-data; name="interestBearingDebt"
+
+20
+--AsyncBoundary
+Content-Disposition: form-data; name="cashAndInterestBearingAssets"
+
+15
+--AsyncBoundary
+Content-Disposition: form-data; name="totalAssetsOrMarketCap"
+
+100
+--AsyncBoundary
+Content-Disposition: form-data; name="totalRevenue"
+
+100
+--AsyncBoundary
+Content-Disposition: form-data; name="nonCompliantIncome"
+
+1
+--AsyncBoundary
+Content-Disposition: form-data; name="documents"; filename="company-financials.pdf"
+Content-Type: application/pdf
+
+< {{samplePdfPath}}
+--AsyncBoundary--
+
+### Save the requestId from the response before polling
+@requestId = PASTE_REQUEST_ID_HERE
+
+### 3. Poll async request status
+GET http://{{host}}:{{port}}/api/v1/stocks/check/{{requestId}}
+Authorization: Bearer {{authToken}}
+
+### 4. List my stock screening history
+GET http://{{host}}:{{port}}/api/v1/stocks/check/history
+Authorization: Bearer {{authToken}}
+
+### 5. Filter history by completed status
+GET http://{{host}}:{{port}}/api/v1/stocks/check/history?status=COMPLETED
+Authorization: Bearer {{authToken}}
+
+### 6. Filter history by halal verdict
+GET http://{{host}}:{{port}}/api/v1/stocks/check/history?verdict=HALAL
+Authorization: Bearer {{authToken}}
+
+### 7. Search history by company or ticker
+GET http://{{host}}:{{port}}/api/v1/stocks/check/history?query=capital
+Authorization: Bearer {{authToken}}
+
+### 8. Fetch explanation-only view
+GET http://{{host}}:{{port}}/api/v1/stocks/check/{{requestId}}/explanation
+Authorization: Bearer {{authToken}}
+
+### 9. Failure case: invalid file type
+POST http://{{host}}:{{port}}/api/v1/stocks/check
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=BadBoundary
+
+--BadBoundary
+Content-Disposition: form-data; name="companyName"
+
+Bad Upload Inc
+--BadBoundary
+Content-Disposition: form-data; name="countryOrMarket"
+
+Tunisia
+--BadBoundary
+Content-Disposition: form-data; name="currency"
+
+TND
+--BadBoundary
+Content-Disposition: form-data; name="businessDescription"
+
+Generic software company
+--BadBoundary
+Content-Disposition: form-data; name="documents"; filename="not-a-pdf.txt"
+Content-Type: text/plain
+
+< C:/temp/not-a-pdf.txt
+--BadBoundary--
+
+### 10. Failure case: invalid sync request with missing ratios
+POST http://{{host}}:{{port}}/api/v1/stocks/check
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=InvalidSyncBoundary
+
+--InvalidSyncBoundary
+Content-Disposition: form-data; name="mode"
+
+SYNC
+--InvalidSyncBoundary
+Content-Disposition: form-data; name="companyName"
+
+Incomplete Co
+--InvalidSyncBoundary
+Content-Disposition: form-data; name="countryOrMarket"
+
+Tunisia
+--InvalidSyncBoundary
+Content-Disposition: form-data; name="currency"
+
+TND
+--InvalidSyncBoundary
+Content-Disposition: form-data; name="businessDescription"
+
+Compliant technology business
+--InvalidSyncBoundary--

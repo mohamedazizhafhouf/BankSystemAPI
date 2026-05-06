@@ -32,8 +32,8 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "tenant_id")
-    private UUID tenantId;
+    @Column(name = "bank_id")
+    private UUID bankId;
 
     @Column(nullable = false)
     private String firstName;
@@ -49,6 +49,9 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     private RoleType roleType;
+
+    @Column(nullable = false)
+    private boolean mustChangePassword = true;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
