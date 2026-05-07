@@ -8,10 +8,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.mely.dto.request.ZakatAssetRequest;
 import com.example.mely.dto.response.ZakatCalculationResponse;
@@ -305,7 +308,52 @@ public class ZakatService {
         }
     }
 
+    public List<ZakatAsset> listActiveZakatAssets(UUID userId) {
+        return zakatAssetRepository.findByUserIdAndIsActiveTrue(userId);
+    }
 
-    
+    @Transactional
+    public ZakatAsset addZakatAssetForUser(UUID userId, ZakatAssetRequest request) {
+        request.setUserId(userId);
+        return addZakatAsset(request);
+    }
+
+    @Transactional
+    public ZakatAsset updateZakatAssetForUser(UUID userId, UUID assetId, ZakatAssetRequest request) {
+        ZakatAsset asset = zakatAssetRepository.findById(assetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
+        if (!asset.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found");
+        }
+        asset.setAssetType(request.getAssetType());
+        asset.setAmount(request.getAmount());
+        asset.setValue(request.getValue());
+        asset.setCurrencyCode(request.getCurrencyCode() != null ? request.getCurrencyCode() : "SAR");
+        asset.setDescription(request.getDescription());
+        if (request.getAcquisitionDate() != null) {
+            asset.setAcquisitionDate(request.getAcquisitionDate());
+        }
+        asset.setWeight(request.getWeight());
+        asset.setPurity(request.getPurity());
+        asset.setAnnualReturnRate(request.getAnnualReturnRate());
+        asset.setLastUpdated(LocalDateTime.now());
+        return zakatAssetRepository.save(asset);
+    }
+
+    @Transactional
+    public void deactivateZakatAssetForUser(UUID userId, UUID assetId) {
+        ZakatAsset asset = zakatAssetRepository.findById(assetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
+        if (!asset.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found");
+        }
+        asset.setIsActive(false);
+        asset.setLastUpdated(LocalDateTime.now());
+        zakatAssetRepository.save(asset);
+    }
+
+    public Optional<HawlTracking> findHawlTracking(UUID userId) {
+        return hawlTrackingRepository.findByUserId(userId);
+    }
 
 }

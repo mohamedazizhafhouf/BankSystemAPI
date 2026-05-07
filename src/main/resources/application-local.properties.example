@@ -6,3 +6,6 @@
 #    or uncomment spring.profiles.active=local in application.properties (do not commit if you prefer env-only).
 #
 mely.goldapi.api-key=replace-me-with-your-gold-api-dashboard-key
+
+# APILayer Currencylayer (Currency Data API) — https://docs.apilayer.com/currencylayer/docs/quickstart-guide
+mely.currencylayer.api-key=replace-me-with-your-apilayer-currencylayer-key

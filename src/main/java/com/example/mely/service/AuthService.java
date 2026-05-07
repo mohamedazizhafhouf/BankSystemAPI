@@ -38,6 +38,7 @@ public class AuthService {
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .roleType(RoleType.SAAS_USER)
+                .zakatHandling(true)
                 .createdAt(LocalDateTime.now())
                 .build();
         user = userRepo.save(user);
@@ -71,6 +72,7 @@ public class AuthService {
             return LoginResponse.builder()
                     .token(token)
                     .tokenType("Bearer")
+                    .userId(user.getId())
                     .email(user.getEmail())
                     .role(membership.getRole().name())
                     .organizationId(membership.getOrganizationId())
@@ -94,6 +96,7 @@ public class AuthService {
         return LoginResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
+                .userId(user.getId())
                 .email(user.getEmail())
                 .role(user.getRoleType().name())
                 .organizationId(null)

@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/educational/**").permitAll()
                         .requestMatchers("/api/v1/zakat/**").permitAll()
                         .requestMatchers("/api/v1/metals/**").permitAll()
+                        .requestMatchers("/api/v1/currency/**").permitAll()
                         
                         .anyRequest().authenticated()
 
