@@ -3,6 +3,7 @@ package com.example.mely.model;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 import com.example.mely.model.Enums.RoleType;
@@ -50,7 +51,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     private RoleType roleType;
 
-    @Column(nullable = false)
+    @Column(name = "must_change_password", nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
     private boolean mustChangePassword = true;
 
     @CreationTimestamp

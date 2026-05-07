@@ -1,4 +1,5 @@
 package com.example.mely.controller;
+
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -17,24 +18,25 @@ import com.example.mely.service.ZakatService;
 
 import lombok.RequiredArgsConstructor;
 
-@RestController
+/** Bean name explicit so merges never collide with {@code com.example.mely.zakat.controller.ZakatController}. */
+@RestController("zakatAssetController")
 @RequestMapping("/api/zakat")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-public class ZakatController {
+public class ZakatAssetController {
 
     private final ZakatService zakatService;
-    
+
     @PostMapping("/asset/add")
     public ResponseEntity<ZakatAsset> addZakatAsset(@RequestBody ZakatAssetRequest request) {
         return ResponseEntity.ok(zakatService.addZakatAsset(request));
     }
-    
+
     @GetMapping("/calculate/{userId}")
     public ResponseEntity<ZakatCalculationResponse> calculateZakat(@PathVariable UUID userId) {
         return ResponseEntity.ok(zakatService.calculateZakat(userId));
     }
-    
+
     @PostMapping("/initialize/{userId}")
     public ResponseEntity<String> initializeHawlTracking(@PathVariable UUID userId) {
         zakatService.initializeHawlTracking(userId);

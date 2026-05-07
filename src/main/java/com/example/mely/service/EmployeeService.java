@@ -44,7 +44,7 @@ public class EmployeeService {
         employee.setPassword(password);
         employee.setFirstName(request.getFirstName());
         employee.setLastName(request.getLastName());
-        employee.setRoleType(request.getRoleType());
+        employee.setRoleType(request.getRole());
         employee.setMustChangePassword(true);
         employee.setBankId(admin.getBankId());
 
