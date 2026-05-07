@@ -3,27 +3,26 @@ package com.example.mely.stocks.service;
 import com.example.mely.security.AuthenticatedUser;
 import com.example.mely.security.CurrentAuthenticatedUserProvider;
 import com.example.mely.stocks.dto.RuleResultResponse;
+import com.example.mely.stocks.dto.StockDocumentResponse;
 import com.example.mely.stocks.dto.StockExplanationResponse;
 import com.example.mely.stocks.dto.StockScreeningHistoryItemResponse;
 import com.example.mely.stocks.dto.StockScreeningHistoryResponse;
 import com.example.mely.stocks.dto.StockScreeningRequestForm;
 import com.example.mely.stocks.dto.StockScreeningResponse;
 import com.example.mely.stocks.model.AnalysisMode;
-import com.example.mely.stocks.model.DocumentExtractionStatus;
-import com.example.mely.stocks.model.StockScreeningDocument;
 import com.example.mely.stocks.model.StockScreeningRequest;
 import com.example.mely.stocks.model.StockScreeningResult;
 import com.example.mely.stocks.model.StockScreeningStatus;
+import com.example.mely.stocks.model.StockScreeningMode;
 import com.example.mely.stocks.model.StockVerdict;
 import com.example.mely.stocks.repository.StockScreeningDocumentRepository;
 import com.example.mely.stocks.repository.StockScreeningRequestRepository;
 import com.example.mely.stocks.repository.StockScreeningResultRepository;
-import com.example.mely.stocks.service.impl.LocalDocumentStorageService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -47,48 +46,33 @@ public class StockScreeningService {
     private final StockScreeningRequestRepository requestRepository;
     private final StockScreeningResultRepository resultRepository;
     private final StockScreeningDocumentRepository documentRepository;
-    private final LocalDocumentStorageService documentStorageService;
     private final StockScreeningProcessingService processingService;
-    private final StockScreeningAsyncProcessor asyncProcessor;
     private final CurrentAuthenticatedUserProvider currentAuthenticatedUserProvider;
 
     public StockScreeningService(StockScreeningRequestRepository requestRepository,
                                  StockScreeningResultRepository resultRepository,
                                  StockScreeningDocumentRepository documentRepository,
-                                 LocalDocumentStorageService documentStorageService,
                                  StockScreeningProcessingService processingService,
-                                 StockScreeningAsyncProcessor asyncProcessor,
                                  CurrentAuthenticatedUserProvider currentAuthenticatedUserProvider) {
         this.requestRepository = requestRepository;
         this.resultRepository = resultRepository;
         this.documentRepository = documentRepository;
-        this.documentStorageService = documentStorageService;
         this.processingService = processingService;
-        this.asyncProcessor = asyncProcessor;
         this.currentAuthenticatedUserProvider = currentAuthenticatedUserProvider;
     }
 
     public StockScreeningResponse submit(StockScreeningRequestForm form) {
         AuthenticatedUser actor = currentAuthenticatedUserProvider.getCurrentUser();
         UUID organizationId = actor.getOrganizationId();
-        List<MultipartFile> documents = sanitizeDocuments(form.getDocuments());
-        validateDocuments(documents);
 
-        AnalysisMode requestedMode = resolveRequestedMode(form.getMode());
-        boolean hasDocuments = !documents.isEmpty();
-        boolean hasAllRequiredSyncMetrics = hasAllRequiredSyncMetrics(form);
-
-        if (requestedMode == AnalysisMode.SYNC && (hasDocuments || !hasAllRequiredSyncMetrics)) {
-            throw new IllegalArgumentException("SYNC mode requires manual financial inputs for all core ratios and does not support uploaded documents.");
+        if (!hasAllRequiredSyncMetrics(form)) {
+            throw new IllegalArgumentException("Manual screening requires all core financial metrics.");
         }
-
-        AnalysisMode effectiveMode = hasDocuments || requestedMode == AnalysisMode.ASYNC
-                ? AnalysisMode.ASYNC
-                : AnalysisMode.SYNC;
 
         StockScreeningRequest request = StockScreeningRequest.builder()
                 .organizationId(organizationId)
                 .createdByUserId(actor.getUserId())
+                .screeningMode(StockScreeningMode.MANUAL)
                 .companyName(form.getCompanyName())
                 .ticker(form.getTicker())
                 .countryOrMarket(form.getCountryOrMarket())
@@ -97,44 +81,15 @@ public class StockScreeningService {
                 .sector(form.getSector())
                 .fiscalYear(form.getFiscalYear())
                 .reportingPeriod(form.getReportingPeriod())
-                .requestedMode(effectiveMode)
+                .requestedMode(AnalysisMode.SYNC)
                 .status(StockScreeningStatus.SUBMITTED)
                 .manualMetrics(buildManualMetrics(form))
                 .warnings(new ArrayList<>())
                 .build();
         request = requestRepository.saveAndFlush(request);
 
-        List<StockScreeningDocument> persistedDocuments = new ArrayList<>();
-        for (MultipartFile document : documents) {
-            LocalDocumentStorageService.StoredDocument storedDocument = documentStorageService.store(request.getId(), document);
-            StockScreeningDocument entity = StockScreeningDocument.builder()
-                    .organizationId(organizationId)
-                    .createdByUserId(actor.getUserId())
-                    .request(request)
-                    .originalFileName(document.getOriginalFilename() == null ? "document.pdf" : document.getOriginalFilename())
-                    .storedFileName(storedDocument.getStoredFileName())
-                    .storagePath(storedDocument.getStoragePath())
-                    .contentType(storedDocument.getContentType())
-                    .size(storedDocument.getSize())
-                    .checksumSha256(storedDocument.getChecksum())
-                    .extractionStatus(DocumentExtractionStatus.PENDING)
-                    .sourceMetadata(Map.of("storagePath", storedDocument.getStoragePath()))
-                    .build();
-            persistedDocuments.add(entity);
-        }
-        if (!persistedDocuments.isEmpty()) {
-            documentRepository.saveAll(persistedDocuments);
-        }
-
-        if (effectiveMode == AnalysisMode.SYNC) {
-            StockScreeningRequest processedRequest = processingService.processRequest(request.getId());
-            return toResponse(processedRequest, processedRequest.getResult());
-        }
-
-        request.setStatus(StockScreeningStatus.PROCESSING);
-        requestRepository.save(request);
-        asyncProcessor.process(request.getId());
-        return toResponse(request, null);
+        StockScreeningRequest processedRequest = processingService.processRequest(request.getId());
+        return toResponse(processedRequest, processedRequest.getResult());
     }
 
     public StockScreeningResponse getById(UUID requestId) {
@@ -149,6 +104,7 @@ public class StockScreeningService {
 
         return StockExplanationResponse.builder()
                 .requestId(request.getId())
+                .screeningMode(request.getScreeningMode())
                 .status(request.getStatus())
                 .verdict(result != null ? result.getVerdict() : null)
                 .explanation(result != null ? result.getExplanation() : null)
@@ -166,13 +122,13 @@ public class StockScreeningService {
         StockVerdict verdict = parseVerdict(rawVerdict);
         String query = normalizeQuery(rawQuery);
 
-        Page<StockScreeningRequest> historyPage = requestRepository.findHistoryByCreatedByUserId(
-                actor.getUserId(),
-                status,
-                verdict,
-                query,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
-        );
+        List<StockScreeningRequest> matchingRequests = requestRepository.findByCreatedByUserIdOrderByCreatedAtDesc(actor.getUserId())
+                .stream()
+                .filter(request -> matchesStatus(request, status))
+                .filter(request -> matchesVerdict(request, verdict))
+                .filter(request -> matchesQuery(request, query))
+                .toList();
+        Page<StockScreeningRequest> historyPage = toHistoryPage(matchingRequests, page, size);
 
         return StockScreeningHistoryResponse.builder()
                 .content(historyPage.getContent().stream().map(this::toHistoryItem).toList())
@@ -232,35 +188,30 @@ public class StockScreeningService {
         return rawQuery.trim().toLowerCase(Locale.ROOT);
     }
 
-    private List<MultipartFile> sanitizeDocuments(List<MultipartFile> documents) {
-        if (documents == null) {
-            return List.of();
-        }
-        return documents.stream()
-                .filter(document -> document != null && !document.isEmpty())
-                .toList();
+    private boolean matchesStatus(StockScreeningRequest request, StockScreeningStatus status) {
+        return status == null || request.getStatus() == status;
     }
 
-    private void validateDocuments(List<MultipartFile> documents) {
-        for (MultipartFile document : documents) {
-            String contentType = document.getContentType();
-            String fileName = document.getOriginalFilename() == null ? "" : document.getOriginalFilename().toLowerCase();
-            boolean pdf = "application/pdf".equalsIgnoreCase(contentType) || fileName.endsWith(".pdf");
-            if (!pdf) {
-                throw new IllegalArgumentException("Only PDF documents are supported in v1.");
-            }
-        }
+    private boolean matchesVerdict(StockScreeningRequest request, StockVerdict verdict) {
+        return verdict == null || (request.getResult() != null && request.getResult().getVerdict() == verdict);
     }
 
-    private AnalysisMode resolveRequestedMode(String rawMode) {
-        if (rawMode == null || rawMode.isBlank()) {
-            return AnalysisMode.SYNC;
+    private boolean matchesQuery(StockScreeningRequest request, String query) {
+        if (query == null) {
+            return true;
         }
-        try {
-            return AnalysisMode.valueOf(rawMode.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("mode must be either SYNC or ASYNC");
-        }
+        return containsIgnoreCase(request.getCompanyName(), query) || containsIgnoreCase(request.getTicker(), query);
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(query);
+    }
+
+    private Page<StockScreeningRequest> toHistoryPage(List<StockScreeningRequest> matchingRequests, int page, int size) {
+        int start = Math.min(page * size, matchingRequests.size());
+        int end = Math.min(start + size, matchingRequests.size());
+        List<StockScreeningRequest> pageContent = matchingRequests.subList(start, end);
+        return new PageImpl<>(pageContent, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")), matchingRequests.size());
     }
 
     private boolean hasAllRequiredSyncMetrics(StockScreeningRequestForm form) {
@@ -289,7 +240,10 @@ public class StockScreeningService {
     private StockScreeningResponse toResponse(StockScreeningRequest request, StockScreeningResult result) {
         return StockScreeningResponse.builder()
                 .requestId(request.getId())
+                .screeningMode(request.getScreeningMode())
                 .status(request.getStatus())
+                .companyName(request.getCompanyName())
+                .ticker(request.getTicker())
                 .verdict(result != null ? result.getVerdict() : null)
                 .needsTatheer(result != null ? result.getNeedsTatheer() : null)
                 .tatheerAmount(result != null ? result.getTatheerAmount() : null)
@@ -299,6 +253,9 @@ public class StockScreeningService {
                 .metricsUsed(result != null ? result.getMetricsUsed() : null)
                 .warnings(result != null ? result.getWarnings() : request.getWarnings())
                 .userMessage(result != null ? result.getUserMessage() : null)
+                .explanation(result != null ? result.getExplanation() : null)
+                .activitySummary(result != null ? result.getActivitySummary() : null)
+                .documents(mapDocuments(request))
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
                 .build();
@@ -336,6 +293,7 @@ public class StockScreeningService {
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
                 .requestedMode(request.getRequestedMode())
+                .screeningMode(request.getScreeningMode())
                 .build();
     }
 
@@ -347,5 +305,17 @@ public class StockScreeningService {
             return request.getWarnings().getFirst();
         }
         return request.getProcessingError();
+    }
+
+    private List<StockDocumentResponse> mapDocuments(StockScreeningRequest request) {
+        return documentRepository.findByRequest_Id(request.getId()).stream()
+                .map(document -> StockDocumentResponse.builder()
+                        .id(document.getId())
+                        .originalFileName(document.getOriginalFileName())
+                        .contentType(document.getContentType())
+                        .size(document.getSize())
+                        .extractionStatus(document.getExtractionStatus())
+                        .build())
+                .toList();
     }
 }

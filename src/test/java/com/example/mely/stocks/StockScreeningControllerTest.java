@@ -9,50 +9,35 @@ import com.example.mely.repository.OrganizationRepository;
 import com.example.mely.repository.UserRepository;
 import com.example.mely.security.jwt.JwtUtils;
 import com.example.mely.stocks.model.StockScreeningRequest;
-import com.example.mely.stocks.model.StockScreeningStatus;
-import com.example.mely.stocks.model.StockVerdict;
 import com.example.mely.stocks.repository.StockScreeningDocumentRepository;
 import com.example.mely.stocks.repository.StockScreeningRequestRepository;
 import com.example.mely.stocks.repository.StockScreeningResultRepository;
-import com.example.mely.stocks.service.FinancialMetricsExtractor;
-import com.example.mely.stocks.service.analysis.ExtractedMetric;
-import com.example.mely.stocks.service.analysis.ExtractionResult;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -108,10 +93,10 @@ class StockScreeningControllerTest {
     private Organization organization;
     private String authHeader;
     private String saasAuthHeader;
-    private String secondSaasAuthHeader;
+    private String secondSaaSAuthHeader;
     private String loanOfficerAuthHeader;
     private User saasUser;
-    private User secondSaasUser;
+    private User secondSaaSUser;
 
     @BeforeEach
     void setUp() {
@@ -187,7 +172,7 @@ class StockScreeningControllerTest {
                 "SAAS"
         );
 
-        secondSaasUser = User.builder()
+        secondSaaSUser = User.builder()
                 .firstName("Other")
                 .lastName("User")
                 .email("other.user@mely.app")
@@ -195,10 +180,10 @@ class StockScreeningControllerTest {
                 .roleType(RoleType.SAAS_USER)
                 .createdAt(LocalDateTime.now())
                 .build();
-        secondSaasUser = userRepository.save(secondSaasUser);
-        secondSaasAuthHeader = "Bearer " + jwtUtils.generateJwtToken(
-                secondSaasUser.getId(),
-                secondSaasUser.getEmail(),
+        secondSaaSUser = userRepository.save(secondSaaSUser);
+        secondSaaSAuthHeader = "Bearer " + jwtUtils.generateJwtToken(
+                secondSaaSUser.getId(),
+                secondSaaSUser.getEmail(),
                 RoleType.SAAS_USER.name(),
                 null,
                 "SAAS"
@@ -217,20 +202,14 @@ class StockScreeningControllerTest {
 
     @Test
     void syncManualRequestReturnsCompletedVerdict() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Sukuk Tech")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Software services for banks")
-                        .param("sector", "Technology")
-                        .param("interestBearingDebt", "20")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "2")
-                        .param("investedAmount", "1000"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Sukuk Tech",
+                                "Software services for banks",
+                                "Technology",
+                                "20", "10", "100", "100", "2", "1000"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.verdict").value("HALAL"))
@@ -240,160 +219,69 @@ class StockScreeningControllerTest {
     }
 
     @Test
-    void pdfUploadCreatesAsyncJobAndCanBePolled() throws Exception {
-        MockMultipartFile document = samplePdf("financials.pdf");
+    void missingCoreMetricsIsRejected() throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("companyName", "No Description");
+        body.put("countryOrMarket", "Tunisia");
+        body.put("currency", "TND");
 
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(document)
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "Async Capital")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Digital payments software")
-                        .param("interestBearingDebt", "20")
-                        .param("cashAndInterestBearingAssets", "15")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "1"))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.status").value("PROCESSING"))
-                .andReturn();
-
-        JsonNode submitJson = objectMapper.readTree(submitResult.getResponse().getContentAsString());
-        String requestId = submitJson.get("requestId").asText();
-
-        mockMvc.perform(get("/api/v1/stocks/check/{requestId}", requestId)
-                        .header("Authorization", authHeader))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PROCESSING"));
-
-        JsonNode completed = waitForCompletion(requestId);
-        assertThat(completed.get("status").asText()).isEqualTo("COMPLETED");
-    }
-
-    @Test
-    void invalidFileTypeIsRejected() throws Exception {
-        MockMultipartFile invalid = new MockMultipartFile(
-                "documents",
-                "financials.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                "not a pdf".getBytes()
-        );
-
-        mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(invalid)
-                        .header("Authorization", authHeader)
-                        .param("companyName", "Bad Upload")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Tech"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Only PDF documents are supported in v1."));
-    }
-
-    @Test
-    void missingRequiredBusinessContextIsRejected() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .header("Authorization", authHeader)
-                        .param("companyName", "No Description")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void manualValuesOverrideExtractedValues() throws Exception {
-        MockMultipartFile document = samplePdf("override.pdf");
-
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(document)
-                        .header("Authorization", authHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "Override Corp")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Compliant software business")
-                        .param("interestBearingDebt", "20")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "2"))
-                .andReturn();
-
-        String requestId = objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("requestId").asText();
-        JsonNode completed = waitForCompletion(requestId);
-
-        assertThat(completed.get("verdict").asText()).isEqualTo("HALAL");
-        assertThat(completed.at("/metricsUsed/interestBearingDebt/source").asText()).isEqualTo("manual");
-        assertThat(completed.at("/metricsUsed/interestBearingDebt/value").decimalValue()).isEqualByComparingTo("20");
+                .andExpect(jsonPath("$.message").value("Manual screening requires all core financial metrics."));
     }
 
     @Test
     void ratioBoundaryAndFailureCasesBehaveAsExpected() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Boundary Ltd")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Cloud software")
-                        .param("interestBearingDebt", "33")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Boundary Ltd",
+                                "Cloud software",
+                                "Technology",
+                                "33", "10", "100", "100", "1", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("HALAL"));
 
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Failure Ltd")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Cloud software")
-                        .param("interestBearingDebt", "34")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Failure Ltd",
+                                "Cloud software",
+                                "Technology",
+                                "34", "10", "100", "100", "1", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("NON_HALAL"));
     }
 
     @Test
     void nonHalalActivityFailsEvenIfRatiosPass() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Casino Cloud")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Casino software and gaming")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "5")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Casino Cloud",
+                                "Casino software and gaming",
+                                "Technology",
+                                "10", "5", "100", "100", "0", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("NON_HALAL"));
     }
 
     @Test
     void purificationGuidanceIsReturnedWithoutHoldings() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Guidance Inc")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Compliant logistics software")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "5")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "2"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Guidance Inc",
+                                "Compliant logistics software",
+                                "Technology",
+                                "10", "5", "100", "100", "2", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("HALAL"))
                 .andExpect(jsonPath("$.needsTatheer").value(true))
@@ -402,68 +290,42 @@ class StockScreeningControllerTest {
     }
 
     @Test
-    void missingMetricsAfterAsyncAnalysisReturnsReviewRequired() throws Exception {
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .header("Authorization", authHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "Review Needed")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Sharia-compliant retail technology"))
-                .andExpect(status().isAccepted())
-                .andReturn();
-
-        String requestId = objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("requestId").asText();
-        JsonNode completed = waitForCompletion(requestId);
-
-        assertThat(completed.get("verdict").asText()).isEqualTo("REVIEW_REQUIRED");
-    }
-
-    @Test
     void organizationScopingIsPersistedOnCreatedRecords() throws Exception {
-        MvcResult result = mockMvc.perform(multipart("/api/v1/stocks/check")
+        MvcResult result = mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Scoped Corp")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Software")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Scoped Corp",
+                                "Software",
+                                "Technology",
+                                "10", "10", "100", "100", "0", null))))
                 .andExpect(status().isOk())
                 .andReturn();
 
         String requestId = objectMapper.readTree(result.getResponse().getContentAsString()).get("requestId").asText();
         StockScreeningRequest persisted = stockScreeningRequestRepository.findById(UUID.fromString(requestId)).orElseThrow();
-        assertThat(persisted.getOrganizationId()).isEqualTo(organization.getId());
-        assertThat(persisted.getCreatedByUserId()).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(persisted.getOrganizationId()).isEqualTo(organization.getId());
+        org.assertj.core.api.Assertions.assertThat(persisted.getCreatedByUserId()).isNotNull();
     }
 
     @Test
     void saasUserCanSubmitAndReadOwnStockRequest() throws Exception {
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
+        MvcResult submitResult = mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", saasAuthHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "SaaS Screening")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Portfolio analytics software")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "SaaS Screening",
+                                "Portfolio analytics software",
+                                "Technology",
+                                "10", "10", "100", "100", "0", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("HALAL"))
                 .andReturn();
 
         String requestId = objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("requestId").asText();
         StockScreeningRequest persisted = stockScreeningRequestRepository.findById(UUID.fromString(requestId)).orElseThrow();
-        assertThat(persisted.getOrganizationId()).isNull();
-        assertThat(persisted.getCreatedByUserId()).isEqualTo(saasUser.getId());
+        org.assertj.core.api.Assertions.assertThat(persisted.getOrganizationId()).isNull();
+        org.assertj.core.api.Assertions.assertThat(persisted.getCreatedByUserId()).isEqualTo(saasUser.getId());
 
         mockMvc.perform(get("/api/v1/stocks/check/{requestId}", requestId)
                         .header("Authorization", saasAuthHeader))
@@ -473,18 +335,14 @@ class StockScreeningControllerTest {
 
     @Test
     void bankEmployeeRoleCanUseStocksCheck() throws Exception {
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", loanOfficerAuthHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", "Employee Access Co")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Software services")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                "Employee Access Co",
+                                "Software services",
+                                "Technology",
+                                "10", "10", "100", "100", "0", null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("HALAL"));
     }
@@ -513,97 +371,6 @@ class StockScreeningControllerTest {
     }
 
     @Test
-    void saasUserHistoryShowsProcessingAsyncRequestImmediately() throws Exception {
-        MockMultipartFile document = samplePdf("history-processing.pdf");
-
-        mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(document)
-                        .header("Authorization", saasAuthHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "History Processing Co")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Digital payments software")
-                        .param("interestBearingDebt", "20")
-                        .param("cashAndInterestBearingAssets", "15")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "1"))
-                .andExpect(status().isAccepted());
-
-        mockMvc.perform(get("/api/v1/stocks/check/history")
-                        .header("Authorization", saasAuthHeader)
-                        .param("status", "PROCESSING"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].companyName").value("History Processing Co"))
-                .andExpect(jsonPath("$.content[0].status").value("PROCESSING"))
-                .andExpect(jsonPath("$.content[0].verdict").value(nullValue()))
-                .andExpect(jsonPath("$.content[0].requestedMode").value("ASYNC"));
-    }
-
-    @Test
-    void completedAsyncRequestAppearsInHistoryWithVerdict() throws Exception {
-        MockMultipartFile document = samplePdf("history-completed.pdf");
-
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(document)
-                        .header("Authorization", saasAuthHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "History Completed Co")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Digital payments software")
-                        .param("interestBearingDebt", "20")
-                        .param("cashAndInterestBearingAssets", "15")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "1"))
-                .andExpect(status().isAccepted())
-                .andReturn();
-
-        String requestId = objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("requestId").asText();
-        waitForStatus(requestId, saasAuthHeader, StockScreeningStatus.COMPLETED);
-
-        mockMvc.perform(get("/api/v1/stocks/check/history")
-                        .header("Authorization", saasAuthHeader)
-                        .param("status", "COMPLETED")
-                        .param("query", "History Completed"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].requestId").value(requestId))
-                .andExpect(jsonPath("$.content[0].status").value("COMPLETED"))
-                .andExpect(jsonPath("$.content[0].verdict").value("HALAL"))
-                .andExpect(jsonPath("$.content[0].purificationRatio").value(0.010000));
-    }
-
-    @Test
-    void failedRequestAppearsInHistory() throws Exception {
-        MockMultipartFile document = samplePdf("history-failed.pdf");
-
-        MvcResult submitResult = mockMvc.perform(multipart("/api/v1/stocks/check")
-                        .file(document)
-                        .header("Authorization", saasAuthHeader)
-                        .param("mode", "ASYNC")
-                        .param("companyName", "Broken Extract")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Digital payments software"))
-                .andExpect(status().isAccepted())
-                .andReturn();
-
-        String requestId = objectMapper.readTree(submitResult.getResponse().getContentAsString()).get("requestId").asText();
-        waitForStatus(requestId, saasAuthHeader, StockScreeningStatus.FAILED);
-
-        mockMvc.perform(get("/api/v1/stocks/check/history")
-                        .header("Authorization", saasAuthHeader)
-                        .param("status", "FAILED"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].requestId").value(requestId))
-                .andExpect(jsonPath("$.content[0].status").value("FAILED"))
-                .andExpect(jsonPath("$.content[0].verdict").value(nullValue()))
-                .andExpect(jsonPath("$.content[0].userMessage").value("Processing failed: Simulated extraction failure"));
-    }
-
-    @Test
     void historyReturnsOnlyRecordsCreatedByAuthenticatedUser() throws Exception {
         submitSyncScreening(
                 saasAuthHeader,
@@ -616,7 +383,7 @@ class StockScreeningControllerTest {
                 "0"
         );
         submitSyncScreening(
-                secondSaasAuthHeader,
+                secondSaaSAuthHeader,
                 "Second User Co",
                 "Treasury software",
                 "10",
@@ -708,36 +475,30 @@ class StockScreeningControllerTest {
                 .andExpect(jsonPath("$.requestId").value(requestId));
     }
 
-    private JsonNode waitForCompletion(String requestId) throws Exception {
-        for (int i = 0; i < 20; i++) {
-            MvcResult pollResult = mockMvc.perform(get("/api/v1/stocks/check/{requestId}", requestId)
-                            .header("Authorization", authHeader))
-                    .andExpect(status().isOk())
-                    .andReturn();
-
-            JsonNode json = objectMapper.readTree(pollResult.getResponse().getContentAsString());
-            if (StockScreeningStatus.COMPLETED.name().equals(json.get("status").asText())) {
-                return json;
-            }
-            Thread.sleep(100);
+    private Map<String, Object> manualBody(String companyName,
+                                          String businessDescription,
+                                          String sector,
+                                          String interestBearingDebt,
+                                          String cashAndInterestBearingAssets,
+                                          String totalAssetsOrMarketCap,
+                                          String totalRevenue,
+                                          String nonCompliantIncome,
+                                          String investedAmount) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("companyName", companyName);
+        body.put("countryOrMarket", "Tunisia");
+        body.put("currency", "TND");
+        body.put("businessDescription", businessDescription);
+        body.put("sector", sector);
+        body.put("interestBearingDebt", new java.math.BigDecimal(interestBearingDebt));
+        body.put("cashAndInterestBearingAssets", new java.math.BigDecimal(cashAndInterestBearingAssets));
+        body.put("totalAssetsOrMarketCap", new java.math.BigDecimal(totalAssetsOrMarketCap));
+        body.put("totalRevenue", new java.math.BigDecimal(totalRevenue));
+        body.put("nonCompliantIncome", new java.math.BigDecimal(nonCompliantIncome));
+        if (investedAmount != null) {
+            body.put("investedAmount", new java.math.BigDecimal(investedAmount));
         }
-        throw new AssertionError("Request did not complete in time");
-    }
-
-    private void waitForStatus(String requestId, String authorizationHeader, StockScreeningStatus expectedStatus) throws Exception {
-        for (int i = 0; i < 20; i++) {
-            MvcResult pollResult = mockMvc.perform(get("/api/v1/stocks/check/{requestId}", requestId)
-                            .header("Authorization", authorizationHeader))
-                    .andExpect(status().isOk())
-                    .andReturn();
-
-            JsonNode json = objectMapper.readTree(pollResult.getResponse().getContentAsString());
-            if (expectedStatus.name().equals(json.get("status").asText())) {
-                return;
-            }
-            Thread.sleep(100);
-        }
-        throw new AssertionError("Request did not reach expected status " + expectedStatus);
+        return body;
     }
 
     private String submitSyncScreening(String authorizationHeader,
@@ -748,92 +509,22 @@ class StockScreeningControllerTest {
                                       String totalAssetsOrMarketCap,
                                       String totalRevenue,
                                       String nonCompliantIncome) throws Exception {
-        MvcResult result = mockMvc.perform(multipart("/api/v1/stocks/check")
+        MvcResult result = mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", authorizationHeader)
-                        .param("mode", "SYNC")
-                        .param("companyName", companyName)
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", businessDescription)
-                        .param("interestBearingDebt", interestBearingDebt)
-                        .param("cashAndInterestBearingAssets", cashAndInterestBearingAssets)
-                        .param("totalAssetsOrMarketCap", totalAssetsOrMarketCap)
-                        .param("totalRevenue", totalRevenue)
-                        .param("nonCompliantIncome", nonCompliantIncome))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(manualBody(
+                                companyName,
+                                businessDescription,
+                                "Technology",
+                                interestBearingDebt,
+                                cashAndInterestBearingAssets,
+                                totalAssetsOrMarketCap,
+                                totalRevenue,
+                                nonCompliantIncome,
+                                null))))
                 .andExpect(status().isOk())
                 .andReturn();
 
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("requestId").asText();
-    }
-
-    private MockMultipartFile samplePdf(String fileName) {
-        return new MockMultipartFile(
-                "documents",
-                fileName,
-                MediaType.APPLICATION_PDF_VALUE,
-                "%PDF-1.4 sample".getBytes()
-        );
-    }
-
-    @TestConfiguration
-    static class StockTestConfig {
-        @Bean
-        @Primary
-        FinancialMetricsExtractor financialMetricsExtractor() {
-            return new FinancialMetricsExtractor() {
-                @Override
-                public ExtractionResult extract(com.example.mely.stocks.model.StockScreeningRequest request, List<com.example.mely.stocks.model.StockScreeningDocument> documents) {
-                    Map<String, ExtractedMetric> metrics = new LinkedHashMap<>();
-                    List<String> warnings = new ArrayList<>();
-
-                    if (!documents.isEmpty()) {
-                        if ("Broken Extract".equals(request.getCompanyName())) {
-                            throw new IllegalStateException("Simulated extraction failure");
-                        }
-                        try {
-                            Thread.sleep(300);
-                        } catch (InterruptedException ex) {
-                            Thread.currentThread().interrupt();
-                        }
-                        metrics.put("interestBearingDebt", ExtractedMetric.builder()
-                                .value(new BigDecimal("90"))
-                                .sourceDocument(documents.getFirst().getOriginalFileName())
-                                .pageNumber(2)
-                                .snippet("Interest-bearing debt: 90")
-                                .build());
-                        metrics.put("cashAndInterestBearingAssets", ExtractedMetric.builder()
-                                .value(new BigDecimal("40"))
-                                .sourceDocument(documents.getFirst().getOriginalFileName())
-                                .pageNumber(3)
-                                .snippet("Interest-bearing cash: 40")
-                                .build());
-                        metrics.put("totalAssetsOrMarketCap", ExtractedMetric.builder()
-                                .value(new BigDecimal("100"))
-                                .sourceDocument(documents.getFirst().getOriginalFileName())
-                                .pageNumber(4)
-                                .snippet("Total assets: 100")
-                                .build());
-                        metrics.put("totalRevenue", ExtractedMetric.builder()
-                                .value(new BigDecimal("100"))
-                                .sourceDocument(documents.getFirst().getOriginalFileName())
-                                .pageNumber(5)
-                                .snippet("Revenue: 100")
-                                .build());
-                        metrics.put("nonCompliantIncome", ExtractedMetric.builder()
-                                .value(new BigDecimal("2"))
-                                .sourceDocument(documents.getFirst().getOriginalFileName())
-                                .pageNumber(6)
-                                .snippet("Non compliant income: 2")
-                                .build());
-                        warnings.add("Test extractor supplied placeholder metrics from uploaded PDFs.");
-                    }
-
-                    return ExtractionResult.builder()
-                            .metrics(metrics)
-                            .warnings(warnings)
-                            .build();
-                }
-            };
-        }
     }
 }

@@ -1,6 +1,7 @@
 package com.example.mely.stocks.dto;
 
 import com.example.mely.stocks.model.StockScreeningStatus;
+import com.example.mely.stocks.model.StockScreeningMode;
 import com.example.mely.stocks.model.StockVerdict;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class StockExplanationResponse {
     private UUID requestId;
+    private StockScreeningMode screeningMode;
     private StockScreeningStatus status;
     private StockVerdict verdict;
     private String explanation;

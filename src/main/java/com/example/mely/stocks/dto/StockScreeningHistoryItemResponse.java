@@ -2,6 +2,7 @@ package com.example.mely.stocks.dto;
 
 import com.example.mely.stocks.model.AnalysisMode;
 import com.example.mely.stocks.model.StockScreeningStatus;
+import com.example.mely.stocks.model.StockScreeningMode;
 import com.example.mely.stocks.model.StockVerdict;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,4 +30,5 @@ public class StockScreeningHistoryItemResponse {
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
     private AnalysisMode requestedMode;
+    private StockScreeningMode screeningMode;
 }

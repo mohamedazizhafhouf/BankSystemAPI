@@ -52,6 +52,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/system/provision","/api/v1/system/provision/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        
+                        // DEMO: Allow all stock and educational endpoints without authentication
+                        .requestMatchers("/api/v1/stocks/**").permitAll()
+                        .requestMatchers("/api/v1/educational/**").permitAll()
+                        .requestMatchers("/api/v1/zakat/**").permitAll()
+                        .requestMatchers("/api/v1/metals/**").permitAll()
+                        
                         .anyRequest().authenticated()
 
                 )
@@ -64,10 +71,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        // DEMO: Allow all origins
+        configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // Here we add custom headers
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Organization-Id", "X-Mely-System-Key"));
+        // DEMO: Allow all headers
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

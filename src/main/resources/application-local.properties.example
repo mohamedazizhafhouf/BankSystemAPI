@@ -1,0 +1,8 @@
+# 1. Copy to application-local.properties (same folder; that file is gitignored).
+# 2. Paste your gold-api.com API key below.
+# 3. Start the API with profile "local", e.g.:
+#      --spring.profiles.active=local
+#    or env: SPRING_PROFILES_ACTIVE=local
+#    or uncomment spring.profiles.active=local in application.properties (do not commit if you prefer env-only).
+#
+mely.goldapi.api-key=replace-me-with-your-gold-api-dashboard-key

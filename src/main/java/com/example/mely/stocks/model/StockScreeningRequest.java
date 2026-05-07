@@ -43,18 +43,23 @@ public class StockScreeningRequest {
     @Column(name = "created_by_user_id", nullable = false)
     private UUID createdByUserId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    private StockScreeningMode screeningMode;
+
+    @Column(length = 255)
     private String companyName;
 
+    @Column(length = 100)
     private String ticker;
 
-    @Column(nullable = false)
+    @Column(length = 255)
     private String countryOrMarket;
 
-    @Column(nullable = false)
+    @Column(length = 50)
     private String currency;
 
-    @Column(nullable = false, length = 4000)
+    @Column(length = 4000)
     private String businessDescription;
 
     private String sector;
@@ -96,3 +101,4 @@ public class StockScreeningRequest {
     @OneToOne(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     private StockScreeningResult result;
 }
+

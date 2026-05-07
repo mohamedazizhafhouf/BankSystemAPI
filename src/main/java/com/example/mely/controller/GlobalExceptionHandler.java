@@ -1,6 +1,5 @@
 package com.example.mely.controller;
 
-import com.example.mely.dto.response.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
@@ -11,48 +10,49 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponse(ex.getMessage()));
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(new ErrorResponse(ex.getMessage()));
+    public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        return ResponseEntity.badRequest().body(new ErrorResponse(message));
+        return ResponseEntity.badRequest().body(Map.of("message", message));
     }
 
     @ExceptionHandler(BindException.class)
-    public ResponseEntity<ErrorResponse> handleBindException(BindException ex) {
+    public ResponseEntity<Map<String, String>> handleBindException(BindException ex) {
         String message = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        return ResponseEntity.badRequest().body(new ErrorResponse(message));
+        return ResponseEntity.badRequest().body(Map.of("message", message));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponse(ex.getMessage()));
+    public ResponseEntity<Map<String, String>> handleConstraintViolation(ConstraintViolationException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("Access denied"));
+    public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
     }
 }

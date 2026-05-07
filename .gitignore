@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local Spring overrides (API keys, etc.)
+src/main/resources/application-local.properties
