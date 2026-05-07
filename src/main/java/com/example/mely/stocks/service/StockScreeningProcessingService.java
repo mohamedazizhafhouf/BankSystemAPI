@@ -70,10 +70,14 @@ public class StockScreeningProcessingService {
         try {
             request.setStatus(StockScreeningStatus.PROCESSING);
             List<StockScreeningDocument> documents = documentRepository.findByRequest_Id(requestId);
-            documents.forEach(document -> document.setExtractionStatus(DocumentExtractionStatus.PROCESSING));
-            documentRepository.saveAll(documents);
+            if (!documents.isEmpty()) {
+                documents.forEach(document -> document.setExtractionStatus(DocumentExtractionStatus.PROCESSING));
+                documentRepository.saveAll(documents);
+            }
 
+            // Manual screening - use financial metrics from form input
             ExtractionResult extractionResult = financialMetricsExtractor.extract(request, documents);
+
             Map<String, ResolvedMetric> metrics = mergeMetrics(request.getManualMetrics(), extractionResult.getMetrics());
             ActivityAnalysisResult activityAnalysisResult = businessActivityAnalyzer.analyze(request, ruleProfile);
             ScreeningComputation computation = screeningRulesEngine.evaluate(ruleProfile, metrics, activityAnalysisResult);

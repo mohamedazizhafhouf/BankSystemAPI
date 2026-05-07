@@ -6,15 +6,14 @@ import com.example.mely.stocks.dto.StockScreeningRequestForm;
 import com.example.mely.stocks.dto.StockScreeningResponse;
 import com.example.mely.stocks.model.StockScreeningStatus;
 import com.example.mely.stocks.service.StockScreeningService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,9 +30,9 @@ public class StockScreeningController {
         this.stockScreeningService = stockScreeningService;
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyAuthority('ADMIN','LOAN_OFFICER','SHARIA_AUDITOR','SAAS_USER')")
-    public ResponseEntity<StockScreeningResponse> submit(@Valid @ModelAttribute StockScreeningRequestForm request) {
+    public ResponseEntity<StockScreeningResponse> submit(@RequestBody StockScreeningRequestForm request) {
         StockScreeningResponse response = stockScreeningService.submit(request);
         HttpStatus status = response.getStatus() == StockScreeningStatus.COMPLETED ? HttpStatus.OK : HttpStatus.ACCEPTED;
         return ResponseEntity.status(status).body(response);

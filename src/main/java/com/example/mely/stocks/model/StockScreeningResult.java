@@ -75,6 +75,9 @@ public class StockScreeningResult {
     @Column(length = 8000)
     private String explanation;
 
+    @Column(length = 5000)
+    private String activitySummary;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

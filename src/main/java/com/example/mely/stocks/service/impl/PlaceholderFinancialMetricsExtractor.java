@@ -17,7 +17,7 @@ public class PlaceholderFinancialMetricsExtractor implements FinancialMetricsExt
     public ExtractionResult extract(StockScreeningRequest request, List<StockScreeningDocument> documents) {
         List<String> warnings = new ArrayList<>();
         if (!documents.isEmpty()) {
-            warnings.add("PDF extraction is using a placeholder adapter. Manual financial inputs remain authoritative until the LLM extractor is connected.");
+            warnings.add("PDF extraction is using a placeholder adapter. Manual financial inputs remain authoritative.");
         }
         return ExtractionResult.builder()
                 .metrics(new LinkedHashMap<>())
