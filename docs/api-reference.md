@@ -25,6 +25,9 @@ http://localhost:8090
   - `GET /api/v1/stocks/check/history`
   - `GET /api/v1/stocks/check/{requestId}`
   - `GET /api/v1/stocks/check/{requestId}/explanation`
+  - `GET /api/v1/personal/coach/monthly-insights`
+  - `POST /api/v1/personal/coach/chat`
+  - `GET /api/v1/personal/coach/chat`
 
 Protected endpoints require:
 
@@ -704,6 +707,103 @@ Success response example:
 Notes:
 - Use this if your frontend wants a dedicated explanation drawer, tab, or modal.
 - If the request is still processing, `verdict` and `explanation` can still be `null`.
+
+### 10. Get AI Finance Coach Monthly Insights
+
+`GET /api/v1/personal/coach/monthly-insights?yearMonth=YYYY-MM`
+
+Returns cached or newly generated Islamic finance coach insights for the authenticated SaaS user. The coach uses the user's monthly cash flow, budgets, goals, zakat portfolio, hawl status, and recent halal stock screenings.
+
+Auth:
+- protected endpoint
+- allowed account type: `SAAS` only
+
+Headers:
+
+```http
+Authorization: Bearer <jwt>
+```
+
+Success response example:
+
+```json
+{
+  "yearMonth": "2026-05",
+  "summary": "Your cash flow is positive this month. Main focus: FOOD budget is close to cap.",
+  "healthScore": 82,
+  "cards": [
+    {
+      "type": "BUDGET_ALERT",
+      "severity": "WARN",
+      "title": "FOOD budget is close to cap",
+      "message": "You used about 90% of this category's monthly budget.",
+      "actionLabel": "Review budgets",
+      "actionRoute": "/wealth"
+    }
+  ],
+  "generatedAt": "2026-05-20T22:15:00"
+}
+```
+
+Notes:
+- Groq is the default provider when `MELY_GROQ_API_KEY` or `mely.ai.groq.api-key` is configured.
+- If no LLM key is configured, the endpoint still returns deterministic guidance from the user's data.
+- Results are cached per user and month.
+
+### 11. Chat With AI Finance Coach
+
+`POST /api/v1/personal/coach/chat`
+
+Sends a user question to the Islamic finance coach. The reply is grounded in the user's Mely finance context and previous coach messages.
+
+Auth:
+- protected endpoint
+- allowed account type: `SAAS` only
+
+Request example:
+
+```json
+{
+  "yearMonth": "2026-05",
+  "message": "Am I ready for zakat?"
+}
+```
+
+Success response example:
+
+```json
+{
+  "assistantMessage": {
+    "id": "8f5db5ab-c921-4791-9868-1a37b8361d9b",
+    "role": "ASSISTANT",
+    "content": "Based on your current Mely data for 2026-05, your financial health score is 78/100...",
+    "yearMonth": "2026-05",
+    "createdAt": "2026-05-20T22:16:20"
+  }
+}
+```
+
+### 12. Get AI Finance Coach Chat History
+
+`GET /api/v1/personal/coach/chat`
+
+Returns the authenticated SaaS user's coach conversation history.
+
+Success response example:
+
+```json
+{
+  "messages": [
+    {
+      "id": "7102e8b8-3b48-4ad8-b4ef-bb03e1d6e1fc",
+      "role": "USER",
+      "content": "Am I ready for zakat?",
+      "yearMonth": "2026-05",
+      "createdAt": "2026-05-20T22:16:18"
+    }
+  ]
+}
+```
 
 ## Frontend Usage Flow
 

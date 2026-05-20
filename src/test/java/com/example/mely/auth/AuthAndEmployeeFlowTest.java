@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -269,18 +268,23 @@ class AuthAndEmployeeFlowTest {
         registerSaasUser("stocks@mely.app");
         String saasToken = loginAndGetToken("stocks@mely.app", "Password123!");
 
-        mockMvc.perform(multipart("/api/v1/stocks/check")
+        mockMvc.perform(post("/api/v1/stocks/check")
                         .header("Authorization", "Bearer " + saasToken)
-                        .param("mode", "SYNC")
-                        .param("companyName", "SaaS Dashboard Co")
-                        .param("countryOrMarket", "Tunisia")
-                        .param("currency", "TND")
-                        .param("businessDescription", "Portfolio software")
-                        .param("interestBearingDebt", "10")
-                        .param("cashAndInterestBearingAssets", "10")
-                        .param("totalAssetsOrMarketCap", "100")
-                        .param("totalRevenue", "100")
-                        .param("nonCompliantIncome", "0"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "mode": "SYNC",
+                                  "companyName": "SaaS Dashboard Co",
+                                  "countryOrMarket": "Tunisia",
+                                  "currency": "TND",
+                                  "businessDescription": "Portfolio software",
+                                  "interestBearingDebt": 10,
+                                  "cashAndInterestBearingAssets": 10,
+                                  "totalAssetsOrMarketCap": 100,
+                                  "totalRevenue": 100,
+                                  "nonCompliantIncome": 0
+                                }
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verdict").value("HALAL"));
     }

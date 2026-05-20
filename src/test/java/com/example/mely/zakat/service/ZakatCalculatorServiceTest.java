@@ -121,6 +121,7 @@ class ZakatCalculatorServiceTest {
     void invalidGoldPrice_throws() {
         properties.setDefaultGoldPricePerGram(BigDecimal.ZERO);
         ZakatCalculationRequest req = baseRequest();
+        req.setGoldPricePerGram(null);
         req.setCash(new BigDecimal("1000"));
 
         assertThatThrownBy(() -> service.calculate(req))

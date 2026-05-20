@@ -9,3 +9,8 @@ mely.goldapi.api-key=replace-me-with-your-gold-api-dashboard-key
 
 # APILayer Currencylayer (Currency Data API) — https://docs.apilayer.com/currencylayer/docs/quickstart-guide
 mely.currencylayer.api-key=replace-me-with-your-apilayer-currencylayer-key
+
+# AI Islamic finance coach. Groq is the default provider; Gemini/OpenAI can be added behind the same backend interface later.
+mely.ai.provider=groq
+mely.ai.groq.api-key=replace-me-with-your-groq-api-key
+mely.ai.groq.model=llama-3.1-8b-instant
